@@ -15,13 +15,15 @@ void curlUpFile(string userName,string clientName,string fileName);
 void curlUpVect(string userName, string clientName,std::vector<string> vect);
 void curlDownFile(string userName, string clientName, string fileName);
 void curlDownVect(string userName, string clientName,std::vector<string> vect);
-void synchronize();
+void synchronize(string userName, string clientName);
 time_t getModDate(string file);
 std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange();
 void requestSyncedFilesInfoFromServer(string userName,string clientName);
 string md5sum(string file);
 void commandInfo();
 string makeRel(string path);
+std::vector<std::tuple<string,string,time_t>> parseInfo();
+string removePath(string filename);
 
 
 
@@ -29,51 +31,40 @@ int main(int argc,char *argv[]){
 	if(argc>1){
 		string arg1=string(argv[1]);
 		if(arg1=="sync"){
-			selectFilesToExchange();
-			synchronize();
+			if(argc==4){
+				synchronize(argv[2],argv[3]);
+			} else {
+				std::cout<<"Usage: crispy sync [username] [clientname]"<<std::endl;
+			}
 		} else if(arg1=="upload"){
 			if(argc==5){
 				curlUpFile(argv[2],argv[3],argv[4]);
-			} else if (argc==2){
-				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
 			} else {
-				std::cout<<"Expected three parameters for upload"<<std::endl;
-				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
 				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
 			}
 		} else if(arg1=="fetchdata"){
 			if(argc==4){
 				requestSyncedFilesInfoFromServer(argv[2],argv[3]);
-			} else if (argc==2){
-				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
 			} else {
-				std::cout<<"Expected three parameters for upload"<<std::endl;
 				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
 			}
 		} else if(arg1=="md5sum"){
 			if(argc==3){
 				std::cout<<md5sum(argv[2]);
 			} else {
-				std::cout<<"Expected one parameter for md5sum"<<std::endl;
-				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
+				std::cout<<"Usage: crispy md5sum [filename]"<<std::endl;
 			}
 		} else if(arg1=="download"){
 			if(argc==5){
 				curlDownFile(argv[2],argv[3],argv[4]);
-			} else if (argc==2){
-				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
 			} else {
-				std::cout<<"Expected three parameters for download"<<std::endl;
 				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
 			}
 		} else if(arg1=="makerel"){
 			if(argc==3){
 				makeRel(argv[2]);
-			} else if (argc==2){
-				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
 			} else {
-				std::cout<<"Expected three parameters for download"<<std::endl;
-				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+				std::cout<<"Usage: crispy makerel [username] [clientname] [filepath]"<<std::endl;
 			}
 		} else {
 			commandInfo();
@@ -101,7 +92,6 @@ void curlUpFile(string userName,string clientName,string fileName){
 	ss<<"-F \"file=@"<<fileName<<"\" ";
 	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/uploader.php";
-	std::cout<<"File name:"<<fileName<<std::endl;
 	system(ss.str().c_str());
 }
 
@@ -113,23 +103,28 @@ void curlUpVect(string userName, string clientName,std::vector<string> vect){
 
 void curlDownFile(string userName, string clientName, string fileName){
 	std::stringstream ss;
-	ss<<"cd ~/.crispy/tmp &&";
+	ss<<"cd ~/.crispy/tmp &&  ";
 	ss<<"curl -JO ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"-F \"clientname="<<clientName<<"\" ";
-	ss<<"-F \"filepath="<<fileName<<"\" ";
+	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/downloader.php";
 	system(ss.str().c_str());
 	ss.str(std::string());
-	string t=fileName;
-	while(*(--t.end())!='.'){//Removes the uniqid
-		t.pop_back();
+	auto servVec=parseInfo();
+	for(auto it=servVec.begin();it!=servVec.end();it++){
+		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash
 	}
-	t.pop_back();
 
-	ss<<"mv ~/.crispy/tmp/"<<t<<" "<<fileName;
-	//system(ss.str().c_str());
+
+	ss<<"mv ~/.crispy/tmp/* "<<fileName;
+	system(ss.str().c_str());
+}
+
+string removePath(string filename){
+	auto p=filename.find_last_of("/");
+	return filename.substr(p+1);
 }
 
 void curlDownVect(string userName, string clientName,std::vector<string> vect){
@@ -160,11 +155,15 @@ void requestSyncedFilesInfoFromServer(string userName,string clientName){
 	system(ss.str().c_str());
 }
 
-void synchronize(){
+void synchronize(string userName, string clientName){
+	requestSyncedFilesInfoFromServer(userName,clientName);//Fetches up to date info
+	auto queue=selectFilesToExchange();//Lists packages to be up/downloaded
+	curlUpVect(userName,clientName,queue.first);
+	curlDownVect(userName,clientName,queue.second);
 
 }
 
-std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
+std::vector<std::tuple<string,string,time_t>> parseInfo(){
 	std::ifstream file(string(getenv("HOME"))+"/.crispy/crispy_info");
 	string filename;
 	string hash;
@@ -189,6 +188,11 @@ std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
 		tm=date;
 		serverVec.push_back(std::tuple<string,string,time_t>(hash,filename,date));
 	}
+	return serverVec;
+}
+
+std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
+	auto serverVec= parseInfo();
 	std::vector<string> newer;
 	std::vector<string> older;
 	for(auto it=serverVec.begin();it!=serverVec.end();it++){
@@ -198,8 +202,7 @@ std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
 		if(hs!=md5sum(fl)){
 			if (getModDate(fl)>dt){
 				newer.push_back(fl);
-			}
-			if (getModDate(fl)<dt){
+			} else if (getModDate(fl)<dt){
 				older.push_back(fl);
 			}
 		} else {
@@ -265,6 +268,5 @@ string makeRel(string path){
 		}
 		t.insert(0,"~/");
 	}
-	std::cout<<t<<std::endl;
 	return t;
 }
