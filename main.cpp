@@ -11,42 +11,46 @@
 
 using std::string;
 
-void curlUpFile(string userName,string clientName,string fileName);
-void curlUpVect(string userName, string clientName,std::vector<string> vect);
-void curlDownFile(string userName, string clientName, string fileName);
-void curlDownVect(string userName, string clientName,std::vector<string> vect);
-void synchronize(string userName, string clientName);
-time_t getModDate(string file);
+void curlUpFile(const string& userName, const string& fileName);
+void curlUpVect(const string& userName,std::vector<string>& vect);
+void curlDownFile(const string& userName, const string& fileName);
+void curlDownVect(const string& userName,std::vector<string>& vect);
+void synchronize(const string& userName);
+time_t getModDate(const string& file);
 std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange();
-void requestSyncedFilesInfoFromServer(string userName,string clientName);
-string md5sum(string file);
+void requestSyncedFilesInfoFromServer(const string& userName);
+string getCommandOutput(const string& command);
+string md5sum(const string& file);
 void commandInfo();
-string makeRel(string path);
+string makeRel( string path);
 std::vector<std::tuple<string,string,time_t>> parseInfo();
-string removePath(string filename);
-
+string removePath(const string& filename);
+void curlDownApp(const string& userName,const string& app);
+bool fileExists (const string& name);
+void curlUpApp(string userName,string app);
+string makeAbs(const string& st);
 
 
 int main(int argc,char *argv[]){
 	if(argc>1){
 		string arg1=string(argv[1]);
 		if(arg1=="sync"){
-			if(argc==4){
-				synchronize(argv[2],argv[3]);
+			if(argc==3){
+				synchronize(argv[2]);
 			} else {
-				std::cout<<"Usage: crispy sync [username] [clientname]"<<std::endl;
+				std::cout<<"Usage: crispy sync [username]"<<std::endl;
 			}
 		} else if(arg1=="upload"){
-			if(argc==5){
-				curlUpFile(argv[2],argv[3],argv[4]);
+			if(argc==4){
+				curlUpFile(argv[2],argv[3]);
 			} else {
-				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
+				std::cout<<"Usage: crispy upload [username] [filename]"<<std::endl;
 			}
 		} else if(arg1=="fetchdata"){
-			if(argc==4){
-				requestSyncedFilesInfoFromServer(argv[2],argv[3]);
+			if(argc==3){
+				requestSyncedFilesInfoFromServer(argv[2]);
 			} else {
-				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
+				std::cout<<"Usage: crispy fetchdata [username]"<<std::endl;
 			}
 		} else if(arg1=="md5sum"){
 			if(argc==3){
@@ -55,16 +59,48 @@ int main(int argc,char *argv[]){
 				std::cout<<"Usage: crispy md5sum [filename]"<<std::endl;
 			}
 		} else if(arg1=="download"){
-			if(argc==5){
-				curlDownFile(argv[2],argv[3],argv[4]);
+			if(argc==4){
+				curlDownFile(argv[2],argv[3]);
 			} else {
-				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+				std::cout<<"Usage: crispy download [username] [filepath]"<<std::endl;
 			}
 		} else if(arg1=="makerel"){
 			if(argc==3){
 				makeRel(argv[2]);
 			} else {
-				std::cout<<"Usage: crispy makerel [username] [clientname] [filepath]"<<std::endl;
+				std::cout<<"Usage: crispy makerel [username] [filepath]"<<std::endl;
+			}
+		}  else if(arg1=="cmd"){
+			if(argc==3){
+				std::cout<<getCommandOutput(argv[2]);
+			} else {
+				std::cout<<"Usage: crispy cmd [cmd]"<<std::endl;
+			}
+		} else if(arg1=="gmod"){
+			if(argc==3){
+				string s="stat -c '%a' "+string(argv[2]);
+				std::cout<<getCommandOutput(s);
+			} else {
+				std::cout<<"Usage: crispy gmod [file]"<<std::endl;
+			}
+		} else if(arg1=="gown"){
+			if(argc==3){
+				string s="stat -c '%a' "+string(argv[2]);
+				std::cout<<getCommandOutput(s);
+			} else {
+				std::cout<<"Usage: crispy gmod [file]"<<std::endl;
+			}
+		} else if(arg1=="download-app"){
+			if(argc==4){
+				curlDownApp(argv[2],argv[3]);
+			} else {
+				std::cout<<"Usage: crispy download-app [username] [app]"<<std::endl;
+			}
+		} else if(arg1=="upload-app"){
+			if(argc==4){
+				curlUpApp(argv[2],argv[3]);
+			} else {
+				std::cout<<"Usage: crispy upload-app [username] [app]"<<std::endl;
 			}
 		} else {
 			commandInfo();
@@ -76,38 +112,36 @@ int main(int argc,char *argv[]){
 
 void commandInfo(){
 	std::cout<<"Commands:"<<std::endl;
-	std::cout<<"\tupload [username] [clientname] [filepath]"<<std::endl;
-	std::cout<<"\tdownload [username] [clientname] [filepath]"<<std::endl;
-	std::cout<<"\tfetchdata [username] [clientname]"<<std::endl;
-	std::cout<<"\tsync"<<std::endl;
+	std::cout<<"\tupload [username] [filepath]"<<std::endl;
+	std::cout<<"\tdownload [username] [filepath]"<<std::endl;
+	std::cout<<"\tfetchdata [username]"<<std::endl;
+	std::cout<<"\tsync [username]"<<std::endl;
 	std::cout<<"\tmd5sum [filepath]"<<std::endl;
 }
 
-void curlUpFile(string userName,string clientName,string fileName){
+void curlUpFile(const string& userName,const string& fileName){
 	std::stringstream ss;
 	ss<<"curl ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
-	ss<<"-F \"clientname="<<clientName<<"\" ";
-	ss<<"-F \"file=@"<<fileName<<"\" ";
+	ss<<"-F \"file=@"<<makeAbs(fileName)<<"\" ";
 	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/uploader.php";
 	system(ss.str().c_str());
 }
 
-void curlUpVect(string userName, string clientName,std::vector<string> vect){
+void curlUpVect(const string& userName,std::vector<string>& vect){
 	for(auto it=vect.begin();it!=vect.end();it++){
-		curlUpFile(userName,clientName,*it);
+		curlUpFile(userName,*it);
 	}
 }
 
-void curlDownFile(string userName, string clientName, string fileName){
+void curlDownFile(const string& userName, const string& fileName){
 	std::stringstream ss;
-	ss<<"cd ~/.crispy/tmp &&  ";
+	ss<<"cd ~/.crispy/tmp && rm *; rm .*; ";
 	ss<<"curl -JO ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
-	ss<<"-F \"clientname="<<clientName<<"\" ";
 	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/downloader.php";
 	system(ss.str().c_str());
@@ -117,49 +151,97 @@ void curlDownFile(string userName, string clientName, string fileName){
 		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash
 	}
 
-
+	ss<<"touch "<<fileName<<" && ";
 	ss<<"mv ~/.crispy/tmp/* "<<fileName;
+	std::cout<<ss.str()<<std::endl;
 	system(ss.str().c_str());
 }
 
-string removePath(string filename){
+void curlDownApp(const string& userName,const string& app){
+	std::stringstream ss;
+	ss<<"curl ";
+	ss<<"-u "+username+":"+password+" ";
+	ss<<"-F \"username="<<userName<<"\" ";
+	ss<<"-F \"app="<<app<<"\" ";
+	ss<<"https://dev.coderagora.com/crispy/app-fetcher.php > ~/.crispy/tmp/fetchapp.apahaca";
+	system(ss.str().c_str());
+
+	std::ifstream file(string(getenv("HOME"))+"/.crispy/tmp/fetchapp.apahaca");
+	string s="";
+	std::vector<string> v;
+	while(!file.eof()){
+		getline(file,s,'\n');
+		if(s.size()!=0){
+			v.push_back(s);
+		}
+	}
+	for (auto it=v.begin();it!=v.end();it++){
+		curlDownFile(userName,*it);
+	}
+}
+
+void curlUpApp(string userName,string app){
+	std::stringstream ss;
+	ss<<"curl ";
+	ss<<"-u "+username+":"+password+" ";
+	ss<<"-F \"username="<<userName<<"\" ";
+	ss<<"-F \"app="<<app<<"\" ";
+	ss<<"https://dev.coderagora.com/crispy/app-uploader.php > ~/.crispy/tmp/fetchapp.apahaca";
+	system(ss.str().c_str());
+
+	std::ifstream file(string(getenv("HOME"))+"/.crispy/tmp/fetchapp.apahaca");
+	string s;
+	std::vector<string> v;
+	while(!file.eof()){
+		getline(file,s,'\n');
+		if(s.size()!=0){
+			v.push_back(s);
+		}
+	}
+	for (auto it=v.begin();it!=v.end();it++){
+		std::cout<<"File:"<<*it<<std::endl;
+		if(fileExists(*it)){
+			std::cout<<"file exists"<<std::endl;
+			curlUpFile(userName,*it);
+		}
+	}
+}
+
+string removePath(const string& filename){
 	auto p=filename.find_last_of("/");
 	return filename.substr(p+1);
 }
 
-void curlDownVect(string userName, string clientName,std::vector<string> vect){
+void curlDownVect(const string& userName,std::vector<string>& vect){
 	for(auto it=vect.begin();it!=vect.end();it++){
-		curlDownFile(userName,clientName,*it);
+		curlDownFile(userName,*it);
 	}
 }
 
-void changePath(string userName, string clientName,string newPath,string oldPath){
+void changePath(const string& userName,const string& newPath,const string& oldPath){
 	std::stringstream ss;
 	ss<<"curl ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
-	ss<<"-F \"clientname="<<clientName<<"\" ";
 	ss<<"-F \"oldpath="<<oldPath<<"\" ";
 	ss<<"-F \"newpath="<<newPath<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/uploader.php\n";//TODO:New page for this
-
 }
 
-void requestSyncedFilesInfoFromServer(string userName,string clientName){
+void requestSyncedFilesInfoFromServer(const string& userName){
 	std::stringstream ss;
 	ss<<"curl ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
-	ss<<"-F \"clientname="<<clientName<<"\" ";
-	ss<<"https://dev.coderagora.com/crispy/db_list.php > ~/.crispy/crispy_info";
+	ss<<"https://dev.coderagora.com/crispy/fetcher.php > ~/.crispy/crispy_info";
 	system(ss.str().c_str());
 }
 
-void synchronize(string userName, string clientName){
-	requestSyncedFilesInfoFromServer(userName,clientName);//Fetches up to date info
+void synchronize(const string& userName){
+	requestSyncedFilesInfoFromServer(userName);//Fetches up to date info
 	auto queue=selectFilesToExchange();//Lists packages to be up/downloaded
-	curlUpVect(userName,clientName,queue.first);
-	curlDownVect(userName,clientName,queue.second);
+	curlUpVect(userName,queue.first);
+	curlDownVect(userName,queue.second);
 
 }
 
@@ -186,13 +268,13 @@ std::vector<std::tuple<string,string,time_t>> parseInfo(){
 		getline(file,dateS,'\n');
 		date=stoi(dateS);
 		tm=date;
-		serverVec.push_back(std::tuple<string,string,time_t>(hash,filename,date));
+		serverVec.push_back(std::tuple<string,string,time_t>(hash,filename,tm));
 	}
 	return serverVec;
 }
 
 std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
-	auto serverVec= parseInfo();
+	auto serverVec = parseInfo();
 	std::vector<string> newer;
 	std::vector<string> older;
 	for(auto it=serverVec.begin();it!=serverVec.end();it++){
@@ -200,6 +282,7 @@ std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
 		string fl=std::get<1>(*it);
 		long dt=std::get<2>(*it);
 		if(hs!=md5sum(fl)){
+			std::cout<<"moddate:"<<getModDate(fl)<<std::endl;
 			if (getModDate(fl)>dt){
 				newer.push_back(fl);
 			} else if (getModDate(fl)<dt){
@@ -220,16 +303,13 @@ std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
 	return std::pair<std::vector<string>,std::vector<string>> {newer,older};
 }
 
-time_t getModDate(string file){
-	struct stat fStat;
-	const char *f={file.c_str()};
-	stat(f,&fStat);
-	return fStat.st_mtime;
+time_t getModDate(const string& file){
+	return atoi(getCommandOutput(string("stat -c '%Y' ")+file).c_str());
 }
 
-string md5sum(string file){
+string md5sum(const string& file){
 	FILE *fpipe;
-	char buff[256];
+	char buff[256]={0};
 	string command="md5sum "+file;
 	fpipe=popen(command.c_str(),"r");
 	fread(buff,256,1,fpipe);
@@ -241,10 +321,23 @@ string md5sum(string file){
 	return r;
 }
 
-string makeRel(string path){
+string getCommandOutput(const string& command){
+	FILE *fpipe;
+	char buff[256]={0};
+	fpipe=popen(command.c_str(),"r");
+	fread(buff,256,1,fpipe);
+
+	std::stringstream ss;
+	ss<<buff;
+	string r="";
+	getline(ss,r,' ');
+	return r;
+}
+
+string makeRel( string path){
 	string hm="/home/";
 	bool match=true;
-	for(int i=0;i<hm.size()&&i<path.size();i++){
+	for(unsigned int i=0;i<hm.size()&&i<path.size();i++){
 		if(path[i]!=hm[i]){
 			match=false;
 			break;
@@ -257,7 +350,9 @@ string makeRel(string path){
 		for(i=0;i<path.size();i++){
 			if(path[i]=='/'){
 				r++;
-				if (r==3){match=true;break;}
+				if (r==3){
+					match=true;break;
+				}
 			}
 		}
 	}
@@ -269,4 +364,19 @@ string makeRel(string path){
 		t.insert(0,"~/");
 	}
 	return t;
+}
+
+string makeAbs(const string& st){
+	string r=st;
+	if(st[0]=='~'){
+		if (st[1]=='/') {
+			r.erase(r.begin());
+			r.insert(0,string(getenv("HOME")));
+		}
+	}
+	return r;
+}
+
+bool fileExists (const string& name) {
+	return !std::ifstream(name);
 }
