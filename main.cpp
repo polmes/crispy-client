@@ -5,17 +5,25 @@
 #include <cstdio>
 #include <vector>
 #include <tuple>
+#include <regex>
 #include <sys/stat.h>
 #include "../pw.hpp"
 
 using std::string;
 
 void curlUpFile(string userName,string clientName,string fileName);
+void curlUpVect(string userName, string clientName,std::vector<string> vect);
+void curlDownFile(string userName, string clientName, string fileName);
+void curlDownVect(string userName, string clientName,std::vector<string> vect);
 void synchronize();
 time_t getModDate(string file);
 std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange();
-void requestSyncedFilesInfoToServer(string userName,string clientName);
+void requestSyncedFilesInfoFromServer(string userName,string clientName);
 string md5sum(string file);
+void commandInfo();
+string makeRel(string path);
+
+
 
 int main(int argc,char *argv[]){
 	if(argc>1){
@@ -31,10 +39,11 @@ int main(int argc,char *argv[]){
 			} else {
 				std::cout<<"Expected three parameters for upload"<<std::endl;
 				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
+				std::cout<<"Usage: crispy upload [username] [clientname] [filename]"<<std::endl;
 			}
 		} else if(arg1=="fetchdata"){
 			if(argc==4){
-				requestSyncedFilesInfoToServer(argv[2],argv[3]);
+				requestSyncedFilesInfoFromServer(argv[2],argv[3]);
 			} else if (argc==2){
 				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
 			} else {
@@ -48,24 +57,40 @@ int main(int argc,char *argv[]){
 				std::cout<<"Expected one parameter for md5sum"<<std::endl;
 				std::cout<<"Usage: crispy fetchdata [username] [clientname]"<<std::endl;
 			}
+		} else if(arg1=="download"){
+			if(argc==5){
+				curlDownFile(argv[2],argv[3],argv[4]);
+			} else if (argc==2){
+				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+			} else {
+				std::cout<<"Expected three parameters for download"<<std::endl;
+				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+			}
+		} else if(arg1=="makerel"){
+			if(argc==3){
+				makeRel(argv[2]);
+			} else if (argc==2){
+				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+			} else {
+				std::cout<<"Expected three parameters for download"<<std::endl;
+				std::cout<<"Usage: crispy download [username] [clientname] [filepath]"<<std::endl;
+			}
 		} else {
-			std::cout<<"Commands:"<<std::endl;
-			std::cout<<"\tupload [username] [clientname] [filename]"<<std::endl;
-			std::cout<<"\tfetchdata [username] [clientname]"<<std::endl;
-
+			commandInfo();
 		}
 	} else {
-		std::cout<<"Commands:"<<std::endl;
-		std::cout<<"\tupload [username] [clientname] [filename]"<<std::endl;
-		std::cout<<"\tfetchdata [username] [clientname]"<<std::endl;
+		commandInfo();
 	}
-	//curlUpFile("crispy","toshiba","/home/ramiro/syncTest/transmitterparams.config");
-	time_t t1=getModDate("/home/ramiro/syncTest/transmitterparams.config");
-	time_t t2=getModDate("/home/ramiro/syncTest/test1.txt");
-	//std::cout<<t1<<" "<<t2<<std::endl;
-	//selectFilesToUpload();
 }
 
+void commandInfo(){
+	std::cout<<"Commands:"<<std::endl;
+	std::cout<<"\tupload [username] [clientname] [filepath]"<<std::endl;
+	std::cout<<"\tdownload [username] [clientname] [filepath]"<<std::endl;
+	std::cout<<"\tfetchdata [username] [clientname]"<<std::endl;
+	std::cout<<"\tsync"<<std::endl;
+	std::cout<<"\tmd5sum [filepath]"<<std::endl;
+}
 
 void curlUpFile(string userName,string clientName,string fileName){
 	std::stringstream ss;
@@ -74,9 +99,43 @@ void curlUpFile(string userName,string clientName,string fileName){
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"-F \"clientname="<<clientName<<"\" ";
 	ss<<"-F \"file=@"<<fileName<<"\" ";
-	ss<<"-F \"filepath="<<fileName<<"\" ";
-	ss<<"https://dev.coderagora.com/crispy/uploader.php\n";
+	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
+	ss<<"https://dev.coderagora.com/crispy/uploader.php";
+	std::cout<<"File name:"<<fileName<<std::endl;
 	system(ss.str().c_str());
+}
+
+void curlUpVect(string userName, string clientName,std::vector<string> vect){
+	for(auto it=vect.begin();it!=vect.end();it++){
+		curlUpFile(userName,clientName,*it);
+	}
+}
+
+void curlDownFile(string userName, string clientName, string fileName){
+	std::stringstream ss;
+	ss<<"cd ~/.crispy/tmp &&";
+	ss<<"curl -JO ";
+	ss<<"-u "+username+":"+password+" ";
+	ss<<"-F \"username="<<userName<<"\" ";
+	ss<<"-F \"clientname="<<clientName<<"\" ";
+	ss<<"-F \"filepath="<<fileName<<"\" ";
+	ss<<"https://dev.coderagora.com/crispy/downloader.php";
+	system(ss.str().c_str());
+	ss.str(std::string());
+	string t=fileName;
+	while(*(--t.end())!='.'){//Removes the uniqid
+		t.pop_back();
+	}
+	t.pop_back();
+
+	ss<<"mv ~/.crispy/tmp/"<<t<<" "<<fileName;
+	//system(ss.str().c_str());
+}
+
+void curlDownVect(string userName, string clientName,std::vector<string> vect){
+	for(auto it=vect.begin();it!=vect.end();it++){
+		curlDownFile(userName,clientName,*it);
+	}
 }
 
 void changePath(string userName, string clientName,string newPath,string oldPath){
@@ -91,13 +150,13 @@ void changePath(string userName, string clientName,string newPath,string oldPath
 
 }
 
-void requestSyncedFilesInfoToServer(string userName,string clientName){
+void requestSyncedFilesInfoFromServer(string userName,string clientName){
 	std::stringstream ss;
 	ss<<"curl ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"-F \"clientname="<<clientName<<"\" ";
-	ss<<"https://dev.coderagora.com/crispy/db_list.php > ~/.crispy_info";
+	ss<<"https://dev.coderagora.com/crispy/db_list.php > ~/.crispy/crispy_info";
 	system(ss.str().c_str());
 }
 
@@ -106,7 +165,7 @@ void synchronize(){
 }
 
 std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
-	std::ifstream file(string(getenv("HOME"))+"/.crispy_info");
+	std::ifstream file(string(getenv("HOME"))+"/.crispy/crispy_info");
 	string filename;
 	string hash;
 	string dateS;
@@ -177,4 +236,35 @@ string md5sum(string file){
 	string r="";
 	getline(ss,r,' ');
 	return r;
+}
+
+string makeRel(string path){
+	string hm="/home/";
+	bool match=true;
+	for(int i=0;i<hm.size()&&i<path.size();i++){
+		if(path[i]!=hm[i]){
+			match=false;
+			break;
+		}
+	}
+	int i=0;
+	if(match){
+		int r=0;
+		match=false;
+		for(i=0;i<path.size();i++){
+			if(path[i]=='/'){
+				r++;
+				if (r==3){match=true;break;}
+			}
+		}
+	}
+	string t=path;
+	if(match){
+		for(;i>=0;i--){
+			t.erase(t.begin());
+		}
+		t.insert(0,"~/");
+	}
+	std::cout<<t<<std::endl;
+	return t;
 }
