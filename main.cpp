@@ -8,7 +8,7 @@ using std::string;
 
 int curlFile(string userName,string clientName,string fileName);
 void synchronize();
-string getModDate(string file);
+time_t getModDate(string file);
 
 int main(int argc,char *argv[]){
 	if(argc>1){
@@ -20,11 +20,14 @@ int main(int argc,char *argv[]){
 		//std::cout<<"Good job";
 	}
 	std::cout<<argv[0]<<std::endl;
-	curlFile("usser","toshiba","/home/ramiro/syncTest/transmitterparams.config");
+	curlUpFile("usser","toshiba","/home/ramiro/syncTest/transmitterparams.config");
+	time_t t1=getModDate("/home/ramiro/syncTest/transmitterparams.config");
+	time_t t2=getModDate("/home/ramiro/syncTest/test1.txt");
+	std::cout<<t2;
 }
 
 
-int curlFile(string userName,string clientName,string fileName){
+int curlUpFile(string userName,string clientName,string fileName){
 	std::stringstream ss;
 	ss<<"curl ";
 	ss<<"-F \"username="<<userName<<"\" ";
@@ -35,12 +38,22 @@ int curlFile(string userName,string clientName,string fileName){
 	system(ss.str().c_str());
 }
 
+void requestSyncedFilesInfoToServer(string userName,string clientName){
+	std::stringstream ss;
+	ss<<"curl ";
+	ss<<"-F \"username="<<userName<<"\" ";
+	ss<<"-F \"clientname="<<clientName<<"\" ";
+	ss<<"https://dev.coderagora.com/crispy/dbdata.php > ~/.crispy_info";
+	system(ss.str().c_str());
+}
+
 void synchronize(){
 
 }
 
-string getModDate(string file){
+time_t getModDate(string file){
 	struct stat fStat;
-	char[] f=file.c_str();
-	stat(&f,fStat);
+	const char *f={file.c_str()};
+	stat(f,&fStat);
+	return fStat.st_mtime;
 }
