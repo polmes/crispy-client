@@ -246,7 +246,7 @@ void requestSyncedFilesInfoFromServer(const string& userName){
 	system(ss.str().c_str());
 	ss.str(string());
 
-	ss<<"killall -r \"(listener.sh)\" &> /dev/null; killall inotifywait &> /dev/null; ./listener.sh &";
+	ss<<"killall -r \"(listener.sh)\" 2> /dev/null; killall inotifywait 2> /dev/null; ./listener.sh &";
 	system(ss.str().c_str());
 }
 
