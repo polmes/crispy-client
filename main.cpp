@@ -29,9 +29,13 @@ void curlDownApp(const string& userName,const string& app);
 bool fileExists (const string& name);
 void curlUpApp(string userName,string app);
 string makeAbs(const string& st);
+string gown(string file);
+string gmod(string file);
+std::pair<string,string> getPerm();
 
 
 int main(int argc,char *argv[]){
+	system("sudo -E sh");
 	if(argc>1){
 		string arg1=string(argv[1]);
 		if(arg1=="sync"){
@@ -78,17 +82,15 @@ int main(int argc,char *argv[]){
 			}
 		} else if(arg1=="gmod"){
 			if(argc==3){
-				string s="stat -c '%a' "+string(argv[2]);
-				std::cout<<getCommandOutput(s);
+				std::cout<<gmod(string(argv[2]));
 			} else {
 				std::cout<<"Usage: crispy gmod [file]"<<std::endl;
 			}
 		} else if(arg1=="gown"){
 			if(argc==3){
-				string s="stat -c '%a' "+string(argv[2]);
-				std::cout<<getCommandOutput(s);
+				std::cout<<gown(string(argv[2]));
 			} else {
-				std::cout<<"Usage: crispy gmod [file]"<<std::endl;
+				std::cout<<"Usage: crispy gown [file]"<<std::endl;
 			}
 		} else if(arg1=="download-app"){
 			if(argc==4){
@@ -99,6 +101,13 @@ int main(int argc,char *argv[]){
 		} else if(arg1=="upload-app"){
 			if(argc==4){
 				curlUpApp(argv[2],argv[3]);
+			} else {
+				std::cout<<"Usage: crispy upload-app [username] [app]"<<std::endl;
+			}
+		} else if(arg1=="perm"){
+			if(argc==2){
+				std::cout<<"MOD:"<<getPerm().first<<std::endl;
+				std::cout<<"OWN:"<<getPerm().second<<std::endl;
 			} else {
 				std::cout<<"Usage: crispy upload-app [username] [app]"<<std::endl;
 			}
@@ -126,6 +135,8 @@ void curlUpFile(const string& userName,const string& fileName){
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"-F \"file=@"<<makeAbs(fileName)<<"\" ";
 	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
+	ss<<"-F \"chown="<<gown(fileName)<<"\" ";
+	ss<<"-F \"chmod="<<gmod(fileName)<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/uploader.php";
 	system(ss.str().c_str());
 }
@@ -138,8 +149,8 @@ void curlUpVect(const string& userName,std::vector<string>& vect){
 
 void curlDownFile(const string& userName, const string& fileName){
 	std::stringstream ss;
-	ss<<"cd ~/.crispy/tmp && rm *; rm .*; ";
-	ss<<"curl -JO ";
+	ss<<"cd ~/.crispy/tmp && rm * 2>/dev/null; rm .* 2>/dev/null; ";
+	ss<<"curl -JOs -D ~/.crispy/ttmmpp/hheeaaddeerr.ttxxtt ";
 	ss<<"-u "+username+":"+password+" ";
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"-F \"filepath="<<makeRel(fileName)<<"\" ";
@@ -148,13 +159,35 @@ void curlDownFile(const string& userName, const string& fileName){
 	ss.str(std::string());
 	auto servVec=parseInfo();
 	for(auto it=servVec.begin();it!=servVec.end();it++){
-		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash
+		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash. If not equal, discard file
 	}
 
 	ss<<"touch "<<fileName<<" && ";
 	ss<<"mv ~/.crispy/tmp/* "<<fileName;
-	std::cout<<ss.str()<<std::endl;
 	system(ss.str().c_str());
+	ss.str(std::string());
+	auto perm=getPerm();
+	ss<<"chmod "<<perm.first<<" "<<fileName<<" ; ";
+	ss<<"chown "<<perm.second<<" "<<fileName;
+	system(ss.str().c_str());
+
+
+}
+
+std::pair<string,string> getPerm(){
+	std::ifstream file(string(getenv("HOME"))+"/.crispy/ttmmpp/hheeaaddeerr.ttxxtt");
+	std::stringstream ss;
+	ss<<file.rdbuf();
+	string s=ss.str();
+	string a="crispy-mod: ";
+	int p=s.find(a);
+	string b="crispy-own: ";
+	int q=s.find(b);
+	int r=s.find("Content-Type: ");
+
+	string mod=s.substr(p+a.length(),q-p-a.length()-2);
+	string own=s.substr(q+b.length(),r-q-b.length()-2);
+	return std::pair<string,string>{mod,own};
 }
 
 void curlDownApp(const string& userName,const string& app){
@@ -379,4 +412,20 @@ string makeAbs(const string& st){
 
 bool fileExists (const string& name) {
 	return !std::ifstream(name);
+}
+
+string gown(string file){
+	string s="stat -c '%U' "+file;
+	string t="stat -c '%G' "+file;
+	string r="";
+	r+=getCommandOutput(s);
+	r.pop_back();
+	r+=":";
+	r+=getCommandOutput(t);
+	return r;
+}
+
+string gmod(string file){
+	string s="stat -c '%a' "+file;
+	return getCommandOutput(s);
 }
