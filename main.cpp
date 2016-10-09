@@ -32,84 +32,53 @@ string makeAbs(const string& st);
 string gown(string file);
 string gmod(string file);
 std::pair<string,string> getPerm();
-
+string getUser();
 
 int main(int argc,char *argv[]){
-	system("sudo -E sh");
+	//system("sudo -E su");
 	if(argc>1){
 		string arg1=string(argv[1]);
 		if(arg1=="sync"){
-			if(argc==3){
-				synchronize(argv[2]);
+			if(argc==2){
+				synchronize(getUser());
 			} else {
-				std::cout<<"Usage: crispy sync [username]"<<std::endl;
+				std::cout<<"Usage: crispy sync"<<std::endl;
 			}
 		} else if(arg1=="upload"){
-			if(argc==4){
-				curlUpFile(argv[2],argv[3]);
-			} else {
-				std::cout<<"Usage: crispy upload [username] [filename]"<<std::endl;
-			}
-		} else if(arg1=="fetchdata"){
 			if(argc==3){
-				requestSyncedFilesInfoFromServer(argv[2]);
+				curlUpFile(getUser(),argv[2]);
 			} else {
-				std::cout<<"Usage: crispy fetchdata [username]"<<std::endl;
-			}
-		} else if(arg1=="md5sum"){
-			if(argc==3){
-				std::cout<<md5sum(argv[2]);
-			} else {
-				std::cout<<"Usage: crispy md5sum [filename]"<<std::endl;
+				std::cout<<"Usage: crispy upload [filename]"<<std::endl;
 			}
 		} else if(arg1=="download"){
-			if(argc==4){
-				curlDownFile(argv[2],argv[3]);
-			} else {
-				std::cout<<"Usage: crispy download [username] [filepath]"<<std::endl;
-			}
-		} else if(arg1=="makerel"){
 			if(argc==3){
-				makeRel(argv[2]);
+				curlDownFile(getUser(),argv[2]);
 			} else {
-				std::cout<<"Usage: crispy makerel [username] [filepath]"<<std::endl;
+				std::cout<<"Usage: crispy download [filepath]"<<std::endl;
 			}
-		}  else if(arg1=="cmd"){
-			if(argc==3){
-				std::cout<<getCommandOutput(argv[2]);
+		} else if(arg1=="fetchdata"){
+			if(argc==2){
+				requestSyncedFilesInfoFromServer(getUser());
 			} else {
-				std::cout<<"Usage: crispy cmd [cmd]"<<std::endl;
-			}
-		} else if(arg1=="gmod"){
-			if(argc==3){
-				std::cout<<gmod(string(argv[2]));
-			} else {
-				std::cout<<"Usage: crispy gmod [file]"<<std::endl;
-			}
-		} else if(arg1=="gown"){
-			if(argc==3){
-				std::cout<<gown(string(argv[2]));
-			} else {
-				std::cout<<"Usage: crispy gown [file]"<<std::endl;
+				std::cout<<"Usage: crispy fetchdata"<<std::endl;
 			}
 		} else if(arg1=="download-app"){
-			if(argc==4){
-				curlDownApp(argv[2],argv[3]);
+			if(argc==3){
+				curlDownApp(getUser(),argv[2]);
 			} else {
-				std::cout<<"Usage: crispy download-app [username] [app]"<<std::endl;
+				std::cout<<"Usage: crispy download-app [app]"<<std::endl;
 			}
 		} else if(arg1=="upload-app"){
-			if(argc==4){
-				curlUpApp(argv[2],argv[3]);
+			if(argc==3){
+				curlUpApp(getUser(),argv[2]);
 			} else {
-				std::cout<<"Usage: crispy upload-app [username] [app]"<<std::endl;
+				std::cout<<"Usage: crispy upload-app [app]"<<std::endl;
 			}
-		} else if(arg1=="perm"){
+		} else if(arg1=="user"){
 			if(argc==2){
-				std::cout<<"MOD:"<<getPerm().first<<std::endl;
-				std::cout<<"OWN:"<<getPerm().second<<std::endl;
+				std::cout<<getUser();
 			} else {
-				std::cout<<"Usage: crispy upload-app [username] [app]"<<std::endl;
+				std::cout<<"Usage: crispy user"<<std::endl;
 			}
 		} else {
 			commandInfo();
@@ -121,11 +90,12 @@ int main(int argc,char *argv[]){
 
 void commandInfo(){
 	std::cout<<"Commands:"<<std::endl;
-	std::cout<<"\tupload [username] [filepath]"<<std::endl;
-	std::cout<<"\tdownload [username] [filepath]"<<std::endl;
-	std::cout<<"\tfetchdata [username]"<<std::endl;
-	std::cout<<"\tsync [username]"<<std::endl;
-	std::cout<<"\tmd5sum [filepath]"<<std::endl;
+	std::cout<<"\tupload [filepath]"<<std::endl;
+	std::cout<<"\tdownload [filepath]"<<std::endl;
+	std::cout<<"\tfetchdata"<<std::endl;
+	std::cout<<"\tsync"<<std::endl;
+	std::cout<<"\tdownload-app [app]"<<std::endl;
+	std::cout<<"\tupload-app [app]"<<std::endl;
 }
 
 void curlUpFile(const string& userName,const string& fileName){
@@ -162,13 +132,13 @@ void curlDownFile(const string& userName, const string& fileName){
 		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash. If not equal, discard file
 	}
 
-	ss<<"touch "<<fileName<<" && ";
-	ss<<"mv ~/.crispy/tmp/* "<<fileName;
+	ss<<"sudo -E touch "<<fileName<<" && ";
+	ss<<"sudo -E mv ~/.crispy/tmp/* "<<fileName;
 	system(ss.str().c_str());
 	ss.str(std::string());
 	auto perm=getPerm();
-	ss<<"chmod "<<perm.first<<" "<<fileName<<" ; ";
-	ss<<"chown "<<perm.second<<" "<<fileName;
+	ss<<"sudo -E chmod "<<perm.first<<" "<<fileName<<" ; ";
+	ss<<"sudo -E chown "<<perm.second<<" "<<fileName;
 	system(ss.str().c_str());
 
 
@@ -268,6 +238,9 @@ void requestSyncedFilesInfoFromServer(const string& userName){
 	ss<<"-F \"username="<<userName<<"\" ";
 	ss<<"https://dev.coderagora.com/crispy/fetcher.php > ~/.crispy/crispy_info";
 	system(ss.str().c_str());
+	ss.str(string());
+
+	ss<<"killall listener";
 }
 
 void synchronize(const string& userName){
@@ -428,4 +401,11 @@ string gown(string file){
 string gmod(string file){
 	string s="stat -c '%a' "+file;
 	return getCommandOutput(s);
+}
+
+string getUser(){
+	std::ifstream file(string(getenv("HOME"))+"/.crispy/crispy_client");
+	string s;
+	getline(file,s);
+	return s;
 }
