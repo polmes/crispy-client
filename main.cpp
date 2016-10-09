@@ -129,7 +129,13 @@ void curlDownFile(const string& userName, const string& fileName){
 	ss.str(std::string());
 	auto servVec=parseInfo();
 	for(auto it=servVec.begin();it!=servVec.end();it++){
-		if (std::get<1>(*it)==fileName){std::cout<<"check";}//TODO:Check hash. If not equal, discard file
+		if (std::get<1>(*it)==fileName){//TODO:Check hash. If not equal, discard file
+			if(std::get<0>(*it)==md5sum(fileName)){
+
+			} else {
+				return;
+			}
+		}
 	}
 
 	ss<<"sudo -E touch "<<fileName<<" && ";
@@ -138,7 +144,7 @@ void curlDownFile(const string& userName, const string& fileName){
 	ss.str(std::string());
 	auto perm=getPerm();
 	ss<<"sudo -E chmod "<<perm.first<<" "<<fileName<<" ; ";
-	ss<<"sudo -E chown "<<perm.second<<" "<<fileName;
+	ss<<"sudo -E chown "<<perm.second<<" "<<fileName<<" 2> /dev/null || sudo -E chown root:root "<<fileName;
 	system(ss.str().c_str());
 
 
@@ -202,9 +208,9 @@ void curlUpApp(string userName,string app){
 		}
 	}
 	for (auto it=v.begin();it!=v.end();it++){
-		std::cout<<"File:"<<*it<<std::endl;
+		//std::cout<<"File:"<<*it<<std::endl;
 		if(fileExists(*it)){
-			std::cout<<"file exists"<<std::endl;
+			//std::cout<<"file exists"<<std::endl;
 			curlUpFile(userName,*it);
 		}
 	}
@@ -289,7 +295,7 @@ std::pair<std::vector<string>,std::vector<string>> selectFilesToExchange(){
 		string fl=std::get<1>(*it);
 		long dt=std::get<2>(*it);
 		if(hs!=md5sum(fl)){
-			std::cout<<"moddate:"<<getModDate(fl)<<std::endl;
+			//std::cout<<"moddate:"<<getModDate(fl)<<std::endl;
 			if (getModDate(fl)>dt){
 				newer.push_back(fl);
 			} else if (getModDate(fl)<dt){
