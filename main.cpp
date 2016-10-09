@@ -385,7 +385,10 @@ string makeAbs(const string& st){
 }
 
 bool fileExists (const string& name) {
-	return !std::ifstream(name);
+	string f=makeAbs(name);
+	struct stat buf;
+	auto r=(stat(f.c_str(), &buf) == 0);
+    return r;
 }
 
 string gown(string file){
