@@ -240,7 +240,8 @@ void requestSyncedFilesInfoFromServer(const string& userName){
 	system(ss.str().c_str());
 	ss.str(string());
 
-	ss<<"killall listener";
+	ss<<"killall -r \"(listener.sh)\" && killall inotifywait ; ./listener.sh &";
+	system(ss.str().c_str());
 }
 
 void synchronize(const string& userName){
