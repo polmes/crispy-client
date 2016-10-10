@@ -7,7 +7,7 @@
 #include <tuple>
 #include <regex>
 #include <sys/stat.h>
-#include "../pw.hpp"
+#include "pw.hpp"
 
 using std::string;
 
